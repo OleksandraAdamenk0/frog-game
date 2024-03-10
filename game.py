@@ -2,7 +2,7 @@ import random
 from typing import List
 
 import pygame
-
+from sys import exit
 from const import *
 from enemy import Enemy
 from player import Player

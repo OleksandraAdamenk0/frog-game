@@ -1,61 +1,66 @@
 import random
-
 import pygame.display
 from pygame.sprite import Sprite
-from pygame.rect import Rect
-from pygame.math import Vector2 as Vector
+from typing import List
+from const import MAIN_SURFACE_SIZE
+from tools import AnimatedImage, angel_to_vector, normalize_angle
 
 
 class Enemy(Sprite):
+
+    ENEMY_SCREEN_BORDERS = (-50, - 50, MAIN_SURFACE_SIZE[0] + 50, MAIN_SURFACE_SIZE[1] + 50)
+
     def __init__(self, images: list, x: int, y: int):
         Sprite.__init__(self)
-        self.images = images
-        self.image = self.images[0]
+        # animation
+        self.__animated_image = AnimatedImage(images, 0.02, True)
 
-        self.frame_amount = len(self.images)
-        self.current_frame = 0
-
-        self.rect: pygame.Rect = self.images[0].get_rect()
+        # image and rect for drawing all group in draw method from Sprite class
+        self.image = self.__animated_image.get_frame()
+        self.rect: pygame.Rect = self.image.get_rect()
         self.rect.center = (x, y)
 
-        self.direction = Vector(random.choice([-1, 1]), random.choice([-1, 1]))
-        self.speed = random.randint(1, 2)
+        # movement
+        self.__speed: float = random.randint(1, 2) * 0.1
+        self.__direction: float = 0.0
+        self.__set_new_direction()
 
-    def animation(self):
-        self.current_frame += 0.3
-        if self.current_frame >= self.frame_amount:
-            self.current_frame = 0
+    def __move(self, delta_time: float) -> None:
+        movement_vector = angel_to_vector(self.__direction)
 
-        self.image = self.images[int(self.current_frame)]
+        self.rect.x += movement_vector.x * (self.__speed * delta_time)
 
-    def move(self):
-        self.rect.x += self.direction.x * self.speed
-        if self.rect.x <= 0 and self.direction.x == -1:
-            self.rect.x = 0
-            self.direction.x = random.choice([1, 1])
-        if self.rect.topright[0] >= 600 and self.direction.x == 1:
-            self.rect.x = 600 - self.rect.width
-            self.direction.x = random.choice([-1, -1])
+        # checking horizontal borders
+        if self.rect.x <= Enemy.ENEMY_SCREEN_BORDERS[0] and movement_vector.x < 0:
+            self.__set_custom_direction([135, 225])
+        if self.rect.topright[0] >= Enemy.ENEMY_SCREEN_BORDERS[2] and movement_vector.x > 0:
+            self.__set_custom_direction([135, 225])
 
-        self.rect.y += self.direction.y * self.speed
-        if self.rect.y <= 0 and self.direction.y == -1:
-            self.rect.y = 0
-            self.direction.y = random.choice([1, 1])
-        if self.rect.bottomleft[1] >= 400 and self.direction.y == 1:
-            self.rect.y = 400 - self.rect.height
-            self.direction.y = random.choice([-1, -1])
+        self.rect.y += movement_vector.y * self.__speed * delta_time
 
-    def change_direction(self):
-        random_num = random.randint(1, 1000)
-        if random_num == 2:
-            # self.direction.x = random.choice([-1, 1])
-            # self.direction.y = random.choice([-1, 1])
-            self.direction.x = -self.direction.x
-            self.direction.y = -self.direction.y
+        # checking vertical borders
+        if self.rect.y <= Enemy.ENEMY_SCREEN_BORDERS[1] and movement_vector.y < 0:
+            self.__set_custom_direction([135, 225])
+        if self.rect.bottomleft[1] >= Enemy.ENEMY_SCREEN_BORDERS[3] and movement_vector.y > 0:
+            self.__set_custom_direction([135, 225])
 
-    def update(self):
-        self.animation()
-        self.change_direction()
-        self.move()
+    def __set_custom_direction(self, direction_range: List[int]) -> None:
+        self.__direction += random.randrange(direction_range[0], direction_range[1], 10)
+        self.__direction = normalize_angle(self.__direction)
 
+    def __set_new_direction(self) -> None:
+        self.__direction += random.randrange(10, 360, 10)
+        self.__direction = normalize_angle(self.__direction)
 
+    def __change_direction(self, delta_time: float) -> None:
+        probability = int(1000 / delta_time * 4)
+        random_num = random.randint(0, probability)
+        if random_num == 0:
+            self.__direction += random.randrange(10, 360, 10)
+            self.__direction = normalize_angle(self.__direction)
+
+    def update(self, delta_time: float) -> None:
+        self.__animated_image.update(delta_time)
+        self.image = self.__animated_image.get_frame()
+        self.__change_direction(delta_time)
+        self.__move(delta_time)
